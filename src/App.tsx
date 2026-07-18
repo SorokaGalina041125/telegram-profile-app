@@ -55,9 +55,18 @@ function App() {
     return null;
   });
 
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  // Автоматически создаём сессию при первом открытии
+    const [sessionId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('shared_session');
+    if (saved) return saved;
+    const newSession = `shared_session_${Date.now()}`;
+    localStorage.setItem('shared_session', newSession);
+    return newSession;
+  });
+
   const [cloudSessionId, setCloudSessionId] = useState<string | null>(null);
   const [storageType, setStorageType] = useState<'local' | 'cloud'>('local');
+
   const [isTelegram] = useState(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return false;
@@ -95,22 +104,13 @@ function App() {
     return true;
   });
 
-  // При первом рендере загружаем сессию из localStorage
-  if (!sessionId && !cloudSessionId) {
-    const savedSession = localStorage.getItem('shared_session');
-    if (savedSession) {
-      setSessionId(savedSession);
-    }
-  }
-
   const handleSaveToCloud = () => {
     const tg = window.Telegram?.WebApp;
     if (!tg?.CloudStorage) return;
 
-    const sharedSession = sessionId || `shared_session_${Date.now()}`;
-    tg.CloudStorage.setItem('shared_session', sharedSession, (setErr, success) => {
+    tg.CloudStorage.setItem('shared_session', sessionId || '', (setErr, success) => {
       if (!setErr && success) {
-        setCloudSessionId(sharedSession);
+        setCloudSessionId(sessionId);
         setStorageType('cloud');
         alert('✅ Сессия сохранена в Telegram Cloud Storage!');
       } else {
@@ -184,7 +184,7 @@ function App() {
             <p className="hint">
               {storageType === 'cloud'
                 ? 'Сессия хранится в Telegram Cloud — доступна из любого Mini App!'
-                : 'Сохраните сессию в Cloud, чтобы она была доступна из первого приложения.'}
+                : 'Нажмите "Сохранить в Cloud", чтобы сессия была доступна из первого приложения.'}
             </p>
           </div>
           <div className="actions">
@@ -200,10 +200,10 @@ function App() {
         <section className="card">
           <h2>📋 Как работает</h2>
           <ol style={{ paddingLeft: '20px', lineHeight: '2' }}>
-            <li>Откройте первое приложение (Каталог) — создаётся сессия</li>
-            <li>Нажмите "Сохранить в Cloud"</li>
+            <li>Откройте первое приложение (Каталог) — сохраните сессию в Cloud</li>
             <li>Откройте это приложение (Профиль)</li>
             <li>Нажмите "Загрузить из Cloud" — сессия восстановится!</li>
+            <li>Одинаковый ID сессии в обоих приложениях!</li>
           </ol>
         </section>
       </main>
