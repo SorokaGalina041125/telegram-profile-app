@@ -35,15 +35,14 @@ declare global {
         ready: () => void;
         expand: () => void;
         close: () => void;
-        CloudStorage: {
-          getItem: (key: string, callback: (err: Error | null, value?: string) => void) => void;
-          setItem: (key: string, value: string, callback?: (err: Error | null, success?: boolean) => void) => void;
-          getItems: (keys: string[], callback: (err: Error | null, values?: Record<string, string>) => void) => void;
-          removeItem: (key: string, callback?: (err: Error | null, success?: boolean) => void) => void;
-        };
       };
     };
   }
+}
+
+function getSessionFromURL(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('session');
 }
 
 function App() {
@@ -55,17 +54,9 @@ function App() {
     return null;
   });
 
-  // Автоматически создаём сессию при первом открытии
-    const [sessionId] = useState<string | null>(() => {
-    const saved = localStorage.getItem('shared_session');
-    if (saved) return saved;
-    const newSession = `shared_session_${Date.now()}`;
-    localStorage.setItem('shared_session', newSession);
-    return newSession;
+  const [sessionId] = useState<string | null>(() => {
+    return getSessionFromURL();
   });
-
-  const [cloudSessionId, setCloudSessionId] = useState<string | null>(null);
-  const [storageType, setStorageType] = useState<'local' | 'cloud'>('local');
 
   const [isTelegram] = useState(() => {
     const tg = window.Telegram?.WebApp;
@@ -90,51 +81,8 @@ function App() {
       localStorage.setItem('tg_user', JSON.stringify(userInfo));
       setUserData(userInfo);
     }
-
-    // Пробуем загрузить сессию из Cloud Storage
-    if (tg.CloudStorage) {
-      tg.CloudStorage.getItem('shared_session', (getErr, value) => {
-        if (!getErr && value) {
-          setCloudSessionId(value);
-          setStorageType('cloud');
-        }
-      });
-    }
-
     return true;
   });
-
-  const handleSaveToCloud = () => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg?.CloudStorage) return;
-
-    tg.CloudStorage.setItem('shared_session', sessionId || '', (setErr, success) => {
-      if (!setErr && success) {
-        setCloudSessionId(sessionId);
-        setStorageType('cloud');
-        alert('✅ Сессия сохранена в Telegram Cloud Storage!');
-      } else {
-        alert('❌ Ошибка сохранения в Cloud Storage');
-      }
-    });
-  };
-
-  const handleLoadFromCloud = () => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg?.CloudStorage) return;
-
-    tg.CloudStorage.getItem('shared_session', (getErr, value) => {
-      if (!getErr && value) {
-        setCloudSessionId(value);
-        setStorageType('cloud');
-        alert(`📥 Сессия загружена из Cloud: ${value}`);
-      } else {
-        alert('❌ Сессия не найдена в Cloud Storage');
-      }
-    });
-  };
-
-  const displaySessionId = storageType === 'cloud' ? cloudSessionId : sessionId;
 
   return (
     <div className="app">
@@ -177,34 +125,14 @@ function App() {
         </section>
 
         <section className="card">
-          <h2>💾 Общая сессия</h2>
+          <h2>💾 Сессия из URL</h2>
           <div className="session-info">
-            <p><strong>Тип хранилища:</strong> {storageType === 'cloud' ? '☁️ Cloud Storage' : '💻 Local Storage'}</p>
-            <p><strong>ID сессии:</strong> {displaySessionId || 'Не создана'}</p>
+            <p><strong>ID сессии:</strong> {sessionId || 'Не передан'}</p>
             <p className="hint">
-              {storageType === 'cloud'
-                ? 'Сессия хранится в Telegram Cloud — доступна из любого Mini App!'
-                : 'Нажмите "Сохранить в Cloud", чтобы сессия была доступна из первого приложения.'}
+              ID сессии передан через URL из бота. 
+              Откройте другое приложение — ID будет таким же!
             </p>
           </div>
-          <div className="actions">
-            <button onClick={handleSaveToCloud} className="btn btn-primary">
-              ☁️ Сохранить в Cloud
-            </button>
-            <button onClick={handleLoadFromCloud} className="btn btn-secondary">
-              📥 Загрузить из Cloud
-            </button>
-          </div>
-        </section>
-
-        <section className="card">
-          <h2>📋 Как работает</h2>
-          <ol style={{ paddingLeft: '20px', lineHeight: '2' }}>
-            <li>Откройте первое приложение (Каталог) — сохраните сессию в Cloud</li>
-            <li>Откройте это приложение (Профиль)</li>
-            <li>Нажмите "Загрузить из Cloud" — сессия восстановится!</li>
-            <li>Одинаковый ID сессии в обоих приложениях!</li>
-          </ol>
         </section>
       </main>
     </div>
